@@ -1,19 +1,6 @@
-import { createAPIFileRoute } from "@tanstack/react-start/server";
+import { createServerFn } from "@tanstack/react-start/server";
 
-export const APIRoute = createAPIFileRoute("/api/chat")({
-  POST: async ({ data }) => {
-    const { messages } = data as {
-      messages: Array<{ role: string; content: string }>;
-    };
-
-    const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
-
-    if (!apiKey) {
-      throw new Error("OpenAI API key is not configured on the server");
-    }
-
-    const systemPrompt = `You are Mira, a compassionate wellness companion for the Mind2Care app. Your role is to:
+const systemPrompt = `You are Mira, a compassionate wellness companion for the Mind2Care app. Your role is to:
 - Listen with empathy and without judgment
 - Provide supportive, kind responses focused on mental wellness
 - Ask thoughtful follow-up questions when appropriate
@@ -22,6 +9,18 @@ export const APIRoute = createAPIFileRoute("/api/chat")({
 - Keep responses concise (2-3 sentences max) but warm and personal
 - Use emojis sparingly to add warmth
 - Remind users that you're an AI and not a replacement for professional help`;
+
+export const chatWithAI = createServerFn(
+  { method: "POST" },
+  async (messages: Array<{ role: string; content: string }>) => {
+    const apiKey = process.env.OPENAI_API_KEY;
+    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+    if (!apiKey) {
+      throw new Error(
+        "OpenAI API key is not configured. Please add OPENAI_API_KEY to .dev.vars"
+      );
+    }
 
     try {
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -46,7 +45,9 @@ export const APIRoute = createAPIFileRoute("/api/chat")({
 
       if (!response.ok) {
         const errData = await response.json();
-        throw new Error(errData.error?.message || "Failed to get response from OpenAI");
+        throw new Error(
+          errData.error?.message || "Failed to get response from OpenAI"
+        );
       }
 
       const data = await response.json();
@@ -57,5 +58,5 @@ export const APIRoute = createAPIFileRoute("/api/chat")({
       console.error("OpenAI API error:", error);
       throw error;
     }
-  },
-});
+  }
+);
