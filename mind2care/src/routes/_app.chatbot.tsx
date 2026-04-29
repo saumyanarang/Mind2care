@@ -38,14 +38,7 @@ function Chatbot() {
 - Use emojis sparingly to add warmth
 - Remind users that you're an AI and not a replacement for professional help`;
 
-  const callOpenAI = async (userMessage: string) => {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    const model = import.meta.env.VITE_OPENAI_MODEL || "gpt-4o-mini";
-
-    if (!apiKey || apiKey.includes("your-actual-api-key")) {
-      throw new Error("API key not configured. Please add your OpenAI API key to .env.local");
-    }
-
+  const callChatAPI = async (userMessage: string) => {
     const conversationHistory = messages
       .filter(m => m.role === "user" || m.role === "assistant")
       .map(m => ({
@@ -53,37 +46,29 @@ function Chatbot() {
         content: m.text,
       }));
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("/api/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model,
         messages: [
-          {
-            role: "system",
-            content: getSystemPrompt(),
-          },
           ...conversationHistory,
           {
             role: "user",
             content: userMessage,
           },
         ],
-        temperature: 0.7,
-        max_tokens: 500,
       }),
     });
 
     if (!response.ok) {
       const errData = await response.json();
-      throw new Error(errData.error?.message || "Failed to get response from AI");
+      throw new Error(errData.message || "Failed to get response from AI");
     }
 
     const data = await response.json();
-    return data.choices[0].message.content;
+    return data.message;
   };
 
   const send = async (text: string) => {
@@ -96,7 +81,7 @@ function Chatbot() {
     setTyping(true);
 
     try {
-      const assistantMessage = await callOpenAI(text);
+      const assistantMessage = await callChatAPI(text);
       const assistantTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setMessages((m) => [...m, { role: "assistant", text: assistantMessage, time: assistantTime }]);
     } catch (err) {
@@ -104,7 +89,7 @@ function Chatbot() {
       const fallbackTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setMessages((m) => [...m, { 
         role: "assistant", 
-        text: "I'm having trouble connecting right now. Please make sure your API key is configured in .env.local and try again. 💙", 
+        text: "I'm having trouble connecting right now. Please make sure your API key is configured on the server and try again. 💙", 
         time: fallbackTime 
       }]);
     } finally {
