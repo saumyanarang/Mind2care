@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, Phone, Heart, Smile } from "lucide-react";
+import { Send, Sparkles, Phone, Heart, Smile, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const Route = createFileRoute("/_app/chatbot")({
   head: () => ({ meta: [{ title: "AI Companion — Mind2Care" }] }),
@@ -25,26 +26,102 @@ function Chatbot() {
   const [messages, setMessages] = useState<Msg[]>(initial);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const send = (text: string) => {
+  const getSystemPrompt = () => `You are Mira, a compassionate wellness companion for the Mind2Care app. Your role is to:
+- Listen with empathy and without judgment
+- Provide supportive, kind responses focused on mental wellness
+- Ask thoughtful follow-up questions when appropriate
+- Suggest grounding techniques or coping strategies when relevant
+- Always prioritize user safety and suggest professional help if concerning topics arise
+- Keep responses concise (2-3 sentences max) but warm and personal
+- Use emojis sparingly to add warmth
+- Remind users that you're an AI and not a replacement for professional help`;
+
+  const callOpenAI = async (userMessage: string) => {
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    const model = import.meta.env.VITE_OPENAI_MODEL || "gpt-4o-mini";
+
+    if (!apiKey || apiKey.includes("your-actual-api-key")) {
+      throw new Error("API key not configured. Please add your OpenAI API key to .env.local");
+    }
+
+    const conversationHistory = messages
+      .filter(m => m.role === "user" || m.role === "assistant")
+      .map(m => ({
+        role: m.role,
+        content: m.text,
+      }));
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {
+            role: "system",
+            content: getSystemPrompt(),
+          },
+          ...conversationHistory,
+          {
+            role: "user",
+            content: userMessage,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      }),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error?.message || "Failed to get response from AI");
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  };
+
+  const send = async (text: string) => {
     if (!text.trim()) return;
+    
+    setError(null);
     const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     setMessages((m) => [...m, { role: "user", text, time }]);
     setInput("");
     setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      setMessages((m) => [...m, {
-        role: "assistant",
-        text: "Thank you for sharing 💛 Let's take a slow breath together. What's one small thing that brought you comfort today?",
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+
+    try {
+      const assistantMessage = await callOpenAI(text);
+      const assistantTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      setMessages((m) => [...m, { role: "assistant", text: assistantMessage, time: assistantTime }]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred. Please try again.");
+      const fallbackTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      setMessages((m) => [...m, { 
+        role: "assistant", 
+        text: "I'm having trouble connecting right now. Please make sure your API key is configured in .env.local and try again. 💙", 
+        time: fallbackTime 
       }]);
-    }, 1200);
+    } finally {
+      setTyping(false);
+    }
   };
 
   return (
     <div className="space-y-6">
       <PageHeader title="AI Companion" subtitle="A calm space to talk. I'm here, no judgment." accent="pink" />
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Chat */}
@@ -106,11 +183,16 @@ function Chatbot() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && send(input)}
+                onKeyDown={(e) => e.key === "Enter" && !typing && send(input)}
                 placeholder="Share what's on your mind..."
-                className="flex-1 px-4 py-3 rounded-2xl bg-muted/50 border border-border focus:border-primary outline-none transition-all"
+                disabled={typing}
+                className="flex-1 px-4 py-3 rounded-2xl bg-muted/50 border border-border focus:border-primary outline-none transition-all disabled:opacity-50"
               />
-              <button onClick={() => send(input)} className="px-5 py-3 rounded-2xl gradient-primary text-white shadow-glow hover:scale-105 transition-transform">
+              <button 
+                onClick={() => send(input)} 
+                disabled={typing}
+                className="px-5 py-3 rounded-2xl gradient-primary text-white shadow-glow hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <Send className="h-5 w-5" />
               </button>
             </div>
