@@ -1,0 +1,51 @@
+import { Link } from "@tanstack/react-router";
+import { motion } from "framer-motion";
+import { Sparkles } from "lucide-react";
+import { BackgroundBlobs } from "@/components/BackgroundBlobs";
+import type { ReactNode } from "react";
+
+export function AuthShell({ title, subtitle, children, footer }: { title: string; subtitle: string; children: ReactNode; footer?: ReactNode }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
+      <BackgroundBlobs />
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="relative z-10 w-full max-w-md glass rounded-3xl p-8 shadow-glow"
+      >
+        <Link to="/" className="flex items-center gap-2 mb-8 justify-center">
+          <div className="h-10 w-10 rounded-xl gradient-primary shadow-glow flex items-center justify-center">
+            <Sparkles className="h-5 w-5 text-white" />
+          </div>
+          <span className="font-bold text-xl text-gradient">Mind2Care</span>
+        </Link>
+        <h1 className="text-2xl font-bold text-center">{title}</h1>
+        <p className="text-sm text-muted-foreground text-center mt-1">{subtitle}</p>
+        <div className="mt-6 space-y-4">{children}</div>
+        {footer && <div className="mt-6 text-sm text-center text-muted-foreground">{footer}</div>}
+      </motion.div>
+    </div>
+  );
+}
+
+export function AuthInput({ label, type = "text", placeholder }: { label: string; type?: string; placeholder?: string }) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium">{label}</span>
+      <input
+        type={type}
+        placeholder={placeholder}
+        className="mt-1.5 w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:ring-2 focus:ring-primary/30 outline-none transition-all"
+      />
+    </label>
+  );
+}
+
+export function AuthButton({ children }: { children: ReactNode }) {
+  return (
+    <button className="w-full py-3 rounded-xl gradient-primary text-white font-semibold shadow-glow hover:scale-[1.02] transition-transform">
+      {children}
+    </button>
+  );
+}
