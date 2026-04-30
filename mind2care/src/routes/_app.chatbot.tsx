@@ -4,6 +4,7 @@ import { Send, Sparkles, Phone, Heart, Smile, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { chatWithAI } from "@/server/api";
 
 export const Route = createFileRoute("/_app/chatbot")({
   head: () => ({ meta: [{ title: "AI Companion — Mind2Care" }] }),
@@ -46,33 +47,15 @@ function Chatbot() {
         content: m.text,
       }));
 
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: [
-            ...conversationHistory,
-            {
-              role: "user",
-              content: userMessage,
-            },
-          ],
-        }),
-      });
+    const result = await chatWithAI([
+      ...conversationHistory,
+      {
+        role: "user",
+        content: userMessage,
+      },
+    ]);
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || "Failed to get response from AI");
-      }
-
-      const data = await response.json();
-      return data.message;
-    } catch (error) {
-      throw error;
-    }
+    return result.message;
   };
 
   const send = async (text: string) => {
