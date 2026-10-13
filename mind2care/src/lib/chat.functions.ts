@@ -24,7 +24,7 @@ export const chatWithAI = createServerFn({ method: "POST" })
   .inputValidator((data: { messages: ChatMessage[] }) => data)
   .handler(async ({ data }) => {
     const apiKey = readSecret("GEMINI_API_KEY");
-    const model = readSecret("GEMINI_MODEL") ?? "gemini-2.5-flash";
+    const model = readSecret("GEMINI_MODEL") ?? "gemini-3.8-flash";
 
     if (!apiKey) {
       throw new Error(
@@ -44,21 +44,27 @@ export const chatWithAI = createServerFn({ method: "POST" })
 
     if (!contents.length) throw new Error("No message to send.");
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents,
-          generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
-        }),
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const init: RequestInit = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
       },
-    );
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents,
+        generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
+      }),
+    };
+
+    // Google sometimes returns 429/500/503 during demand spikes. Retry a few times
+    // with a growing delay before giving up.
+    let response = await fetch(url, init);
+    for (let attempt = 1; attempt <= 3 && [429, 500, 503].includes(response.status); attempt++) {
+      await new Promise((r) => setTimeout(r, attempt * 1500));
+      response = await fetch(url, init);
+    }
 
     if (!response.ok) {
       const err = (await response.json().catch(() => null)) as {
