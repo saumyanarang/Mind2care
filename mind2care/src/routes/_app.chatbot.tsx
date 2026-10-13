@@ -4,7 +4,7 @@ import { Send, Sparkles, Phone, Heart, Smile, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { chatWithAI } from "@/server/api";
+import { chatWithAI } from "@/lib/chat.functions";
 
 export const Route = createFileRoute("/_app/chatbot")({
   head: () => ({ meta: [{ title: "AI Companion — Mind2Care" }] }),
@@ -29,16 +29,6 @@ function Chatbot() {
   const [typing, setTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getSystemPrompt = () => `You are Mira, a compassionate wellness companion for the Mind2Care app. Your role is to:
-- Listen with empathy and without judgment
-- Provide supportive, kind responses focused on mental wellness
-- Ask thoughtful follow-up questions when appropriate
-- Suggest grounding techniques or coping strategies when relevant
-- Always prioritize user safety and suggest professional help if concerning topics arise
-- Keep responses concise (2-3 sentences max) but warm and personal
-- Use emojis sparingly to add warmth
-- Remind users that you're an AI and not a replacement for professional help`;
-
   const callChatAPI = async (userMessage: string) => {
     const conversationHistory = messages
       .filter(m => m.role === "user" || m.role === "assistant")
@@ -47,13 +37,11 @@ function Chatbot() {
         content: m.text,
       }));
 
-    const result = await chatWithAI([
-      ...conversationHistory,
-      {
-        role: "user",
-        content: userMessage,
+    const result = await chatWithAI({
+      data: {
+        messages: [...conversationHistory, { role: "user" as const, content: userMessage }],
       },
-    ]);
+    });
 
     return result.message;
   };
@@ -76,7 +64,7 @@ function Chatbot() {
       const fallbackTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setMessages((m) => [...m, { 
         role: "assistant", 
-        text: "I'm having trouble connecting right now. Please make sure your API key is configured on the server and try again. 💙", 
+        text: "I'm having trouble connecting right now. Please try again in a moment. 💙", 
         time: fallbackTime 
       }]);
     } finally {
